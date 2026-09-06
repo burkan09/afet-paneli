@@ -1,3 +1,10 @@
+function isoDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+const now = new Date();
+const weekAgo = new Date(now.getTime() - 7 * 86400000);
+
 const ENDPOINTS = [
   {
     key: "usgs",
@@ -7,17 +14,20 @@ const ENDPOINTS = [
   {
     key: "eonet",
     name: "NASA EONET",
-    url: "https://eonet.gsfc.nasa.gov/api/v3/events?limit=5",
+    url: "https://eonet.gsfc.nasa.gov/api/v3/events?days=20&limit=50&status=open",
   },
   {
     key: "gdacs",
     name: "GDACS",
-    url: "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=EQ,TC,FL,VO,WF",
+    url:
+      "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH" +
+      `?eventlist=EQ,TC,FL,VO,WF,DR&alertlevel=Orange;Red` +
+      `&fromDate=${isoDate(weekAgo)}&toDate=${isoDate(now)}`,
   },
   {
     key: "reliefweb",
-    name: "ReliefWeb",
-    url: "https://api.reliefweb.int/v1/disasters?appname=afet-paneli&limit=5",
+    name: "ReliefWeb v2",
+    url: "https://api.reliefweb.int/v2/disasters?appname=afet-paneli&limit=5",
   },
 ];
 
