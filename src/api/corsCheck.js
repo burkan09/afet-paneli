@@ -24,10 +24,11 @@ const ENDPOINTS = [
       `?eventlist=EQ,TC,FL,VO,WF,DR&alertlevel=Orange;Red` +
       `&fromDate=${isoDate(weekAgo)}&toDate=${isoDate(now)}`,
   },
-  {
+    {
     key: "reliefweb",
-    name: "ReliefWeb v2",
+    name: "ReliefWeb v2 (appname onayı bekleniyor)",
     url: "https://api.reliefweb.int/v2/disasters?appname=afet-paneli&limit=5",
+    optional: true,
   },
 ];
 
