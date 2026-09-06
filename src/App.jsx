@@ -1,77 +1,66 @@
-import { useEffect, useState } from "react";
-import { checkAll } from "./api/corsCheck";
-import { fetchUsgs } from "./api/usgs";
-import { normalizeUsgsCollection } from "./lib/normalize";
-import { timeAgo, magnitudeColor } from "./lib/format";
+import { useMemo } from "react";
+import { FilterProvider, useFilters } from "./context/FilterContext";
+import { useEarthquakes } from "./hooks/useEarthquakes";
+import { useAutoRefresh } from "./hooks/useAutoRefresh";
+import { applyFilters, computeStats } from "./lib/filter";
+import FilterPanel from "./components/Filters/FilterPanel";
+import EventList from "./components/EventList";
+import StatCard from "./components/ui/StatCard";
+import { formatTime } from "./lib/format";
 
-function App() {
-  const [checks, setChecks] = useState(null);
-  const [events, setEvents] = useState([]);
-  const [error, setError] = useState(null);
+function Dashboard() {
+  const { filters } = useFilters();
+  const { events, loading, error, updatedAt, reload } = useEarthquakes(
+    filters.range
+  );
 
-  useEffect(() => {
-    checkAll().then(setChecks);
-  }, []);
+  useAutoRefresh(reload, 60000, filters.autoRefresh);
 
-  useEffect(() => {
-    fetchUsgs("day")
-      .then((json) => setEvents(normalizeUsgsCollection(json)))
-      .catch((err) => setError(err.message));
-  }, []);
+  const filtered = useMemo(
+    () => applyFilters(events, filters).sort((a, b) => b.time - a.time),
+    [events, filters]
+  );
 
-  const top = [...events].sort((a, b) => b.magnitude - a.magnitude).slice(0, 10);
+  const stats = useMemo(() => computeStats(filtered), [filtered]);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-200 p-8">
-      <h1 className="text-2xl font-bold text-emerald-400 mb-6">
-        Faz 0.5 — Bağlantı Testi
-      </h1>
+    <div className="min-h-screen bg-slate-900 text-slate-200">
+      <div className="max-w-4xl mx-auto p-6 sm:p-8">
+        <header className="mb-8">
+          <h1 className="text-2xl font-bold text-emerald-400">
+            Küresel Deprem Paneli
+          </h1>
+          {updatedAt && (
+            <p className="text-xs text-slate-500 mt-1">
+              Son güncelleme: {formatTime(updatedAt)}
+              {filters.autoRefresh && " · otomatik yenileme açık"}
+            </p>
+          )}
+        </header>
 
-      <section className="mb-10">
-        <h2 className="text-lg font-semibold mb-3">API erişilebilirliği</h2>
-        {!checks && <p className="text-slate-400">Test ediliyor...</p>}
-        {checks && (
-          <ul className="space-y-2">
-            {checks.map((c) => (
-              <li
-                key={c.key}
-                className="flex items-center gap-3 bg-slate-800 rounded px-4 py-2"
-              >
-                <span className={c.ok ? "text-emerald-400" : "text-red-400"}>
-                  {c.ok ? "BASARILI" : "HATA"}
-                </span>
-                <span className="font-medium">{c.name}</span>
-                <span className="text-slate-400 text-sm">
-                  {c.detail} · {c.ms} ms
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        <div className="grid grid-cols-3 gap-3 mb-8">
+          <StatCard label="Olay sayısı" value={stats.count} />
+          <StatCard label="En büyük" value={stats.max} hint="büyüklük" />
+          <StatCard label="Ort. derinlik" value={stats.avgDepth} />
+        </div>
 
-      <section>
-        <h2 className="text-lg font-semibold mb-3">
-          Son 24 saatin en büyük 10 depremi
-        </h2>
-        {error && <p className="text-red-400">Hata: {error}</p>}
-        {!error && events.length === 0 && (
-          <p className="text-slate-400">Yükleniyor...</p>
-        )}
-        <ul className="space-y-1">
-          {top.map((e) => (
-            <li key={e.id} className="bg-slate-800 rounded px-4 py-2 flex gap-4">
-              <span className={`font-bold w-12 ${magnitudeColor(e.magnitude)}`}>
-                {e.magnitude.toFixed(1)}
-              </span>
-              <span className="flex-1">{e.title}</span>
-              <span className="text-slate-500 text-sm">{timeAgo(e.time)}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+        <FilterPanel />
+
+        <EventList
+          events={filtered}
+          loading={loading}
+          error={error}
+          onRetry={reload}
+        />
+      </div>
     </div>
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <FilterProvider>
+      <Dashboard />
+    </FilterProvider>
+  );
+}
