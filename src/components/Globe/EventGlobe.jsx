@@ -27,6 +27,8 @@ export default function EventGlobe({
   onPlateClick,
   onHotspots,
   theme = "day",
+  rotating = true,
+  resetSignal = 0,
 }) {
   const globeRef = useRef(null);
   const wrapperRef = useRef(null);
@@ -51,10 +53,11 @@ export default function EventGlobe({
   useEffect(() => {
     const globe = globeRef.current;
     if (!globe) return;
-    globe.controls().autoRotate = true;
-    globe.controls().autoRotateSpeed = 0.3;
-    globe.controls().enableDamping = true;
-  }, []);
+    const controls = globe.controls();
+    controls.autoRotate = rotating;
+    controls.autoRotateSpeed = 0.3;
+    controls.enableDamping = true;
+  }, [rotating]);
 
   useEffect(() => {
     if (!selected || !globeRef.current) return;
@@ -63,6 +66,11 @@ export default function EventGlobe({
       900
     );
   }, [selected]);
+
+  useEffect(() => {
+    if (!resetSignal || !globeRef.current) return;
+    globeRef.current.pointOfView({ lat: 20, lng: 30, altitude: 2.5 }, 900);
+  }, [resetSignal]);
 
   useEffect(() => {
     if (points.length === 0) return;
@@ -135,7 +143,8 @@ export default function EventGlobe({
           if (d.kind === "fault") return 2.2;
           if (d.pairKey === selectedPlate) return 1.8;
           return d.subduction ? 1.0 : 0.7;
-        }}        pathDashLength={(d) =>
+        }}
+        pathDashLength={(d) =>
           d.kind === "fault" ? 0.04 : d.subduction ? 0.6 : 1
         }
         pathDashGap={(d) =>

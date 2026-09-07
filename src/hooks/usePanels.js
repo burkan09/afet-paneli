@@ -10,6 +10,9 @@ const DEFAULT_PANELS = {
   major: { label: "Büyük depremler", open: false },
   gutenberg: { label: "Gutenberg-Richter", open: false },
   migration: { label: "Göç analizi", open: false },
+  chain: { label: "Zincirleme analiz", open: false },
+  legend: { label: "Gösterge", open: false },
+  section: { label: "Derinlik kesiti", open: false },
 };
 
 const MIN_OPEN = 3;

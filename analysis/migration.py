@@ -125,20 +125,43 @@ def main():
     for key, fault in FAULTS.items():
         r = analyse(rows, key, fault)
         if not r:
-            print(f"{fault['label']:24s} yetersiz veri")
+            print(f"{fault['label']:26s} yetersiz veri")
             continue
-
         result[key] = r
+
+    n_tests = len(result)
+    alpha = 0.05
+    bonferroni = alpha / n_tests if n_tests else alpha
+
+    for r in result.values():
+        p = r["significance"]["p"]
+        r["significance"]["n_tests"] = n_tests
+        r["significance"]["bonferroni_alpha"] = round(bonferroni, 6)
+        r["significance"]["survives_correction"] = bool(p < bonferroni)
+
+    for r in sorted(result.values(), key=lambda x: x["significance"]["p"]):
         m, s = r["migration"], r["significance"]
-        win = f"{r['year_range'][0]}-{r['year_range'][1]}" if r["year_range"] else "tümü"
+        mark = "***" if s["survives_correction"] else ("*" if s["p"] < alpha else "")
         print(
-            f"{fault['label']:24s} M{m and r['min_magnitude']:.1f}+ {win:10s} "
-            f"n={r['n']:3d}  {m['velocity_km_per_year']:+7.2f} km/yıl {m['direction']:5s} "
-            f"R²={m['r2']:.3f}  p={s['p']:.4f}"
+            f"{r['label']:26s} n={r['n']:4d}  "
+            f"{m['velocity_km_per_year']:+7.2f} km/yıl {m['direction']:5s} "
+            f"R²={m['r2']:.3f}  p={s['p']:.4f} {mark}"
         )
 
+    raw = [r["label"] for r in result.values() if r["significance"]["p"] < alpha]
+    kept = [r["label"] for r in result.values()
+            if r["significance"]["survives_correction"]]
+
+    print(f"\n{'=' * 60}")
+    print(f"Test edilen fay sayisi      : {n_tests}")
+    print(f"Ham esik (p<0.05) gecen     : {len(raw)} — {', '.join(raw) or 'yok'}")
+    print(f"Sansla beklenen yanlis poz. : {n_tests * alpha:.2f}")
+    print(f"Bonferroni esigi            : p < {bonferroni:.5f}")
+    print(f"Duzeltme sonrasi kalan      : {len(kept)} — {', '.join(kept) or 'yok'}")
+    print(f"{'=' * 60}")
+
     OUT.write_text(json.dumps(result), encoding="utf-8")
-    print(f"\n→ {OUT}")
+    print(f"→ {OUT}")
 
 
 if __name__ == "__main__":

@@ -11,16 +11,20 @@ import { totalEnergy, energyComparison } from "./lib/energy";
 import FilterPanel from "./components/Filters/FilterPanel";
 import EventList from "./components/EventList";
 import EventGlobe from "./components/Globe/EventGlobe";
+import GlobeControls from "./components/Globe/GlobeControls";
 import HotspotPanel from "./components/Globe/HotspotPanel";
 import MajorEventsPanel from "./components/Globe/MajorEventsPanel";
 import DetailPanel from "./components/DetailPanel/DetailPanel";
 import ChartGrid from "./components/Charts/ChartGrid";
 import GutenbergChart from "./components/Charts/GutenbergChart";
 import MigrationPanel from "./components/Analysis/MigrationPanel";
+import ChainPanel from "./components/Analysis/ChainPanel";
 import FloatingPanel from "./components/ui/FloatingPanel";
 import ToolbarMenu from "./components/ui/ToolbarMenu";
 import StatBar from "./components/ui/StatBar";
 import { formatTime } from "./lib/format";
+import Legend from "./components/ui/Legend";
+import DepthSection from "./components/Charts/DepthSection";
 
 function Dashboard() {
   const { filters } = useFilters();
@@ -36,6 +40,8 @@ function Dashboard() {
   const [hotspots, setHotspots] = useState([]);
   const [faultKey, setFaultKey] = useState(null);
   const [selectedPlate, setSelectedPlate] = useState(null);
+  const [rotating, setRotating] = useState(true);
+  const [resetSignal, setResetSignal] = useState(0);
 
   const { data: migrationData } = useAnalysis("migration");
 
@@ -59,7 +65,7 @@ function Dashboard() {
   );
   const handleHotspots = useCallback((next) => setHotspots(next), []);
   const handlePlateClick = useCallback(
-    (name) => setSelectedPlate((prev) => (prev === name ? null : name)),
+    (key) => setSelectedPlate((prev) => (prev === key ? null : key)),
     []
   );
 
@@ -95,6 +101,16 @@ function Dashboard() {
       onPlateClick={handlePlateClick}
       onHotspots={handleHotspots}
       theme={filters.theme}
+      rotating={rotating}
+      resetSignal={resetSignal}
+    />
+  );
+
+  const controls = (
+    <GlobeControls
+      rotating={rotating}
+      onToggle={() => setRotating((v) => !v)}
+      onReset={() => setResetSignal((n) => n + 1)}
     />
   );
 
@@ -126,11 +142,6 @@ function Dashboard() {
                   · {sourceErrors.join(", ")} yanıt vermedi
                 </span>
               )}
-            </p>
-          )}
-          {selectedPlate && (
-            <p className="text-[10px] text-red-400 px-3 pb-2">
-              Seçili levha sınırı: {selectedPlate}
             </p>
           )}
         </FloatingPanel>
@@ -204,6 +215,18 @@ function Dashboard() {
         </FloatingPanel>
       )}
 
+      {show("chain") && (
+        <FloatingPanel
+          {...common}
+          title="Zincirleme analiz"
+          initial={{ x: 760, y: 460 }}
+          width={380}
+          maxHeight={520}
+        >
+          <ChainPanel event={detail} events={events} onSelect={handleSelect} />
+        </FloatingPanel>
+      )}
+
       {show("charts") && (
         <FloatingPanel
           {...common}
@@ -217,12 +240,35 @@ function Dashboard() {
           </div>
         </FloatingPanel>
       )}
+        {show("legend") && (
+        <FloatingPanel
+          {...common}
+          title="Gösterge"
+          initial={{ x: 20, y: 900 }}
+          width={280}
+          maxHeight={420}
+        >
+          <Legend />
+        </FloatingPanel>
+      )}
+
+      {show("section") && (
+        <FloatingPanel
+          {...common}
+          title="Derinlik kesiti"
+          initial={{ x: 400, y: 560 }}
+          width={400}
+          maxHeight={480}
+        >
+          <DepthSection />
+        </FloatingPanel>
+      )}
 
       {show("gutenberg") && (
         <FloatingPanel
           {...common}
           title="Gutenberg-Richter"
-          initial={{ x: 760, y: 460 }}
+          initial={{ x: 1160, y: 20 }}
           width={340}
           maxHeight={470}
         >
@@ -234,14 +280,11 @@ function Dashboard() {
         <FloatingPanel
           {...common}
           title="Göç analizi"
-          initial={{ x: 1120, y: 20 }}
+          initial={{ x: 1160, y: 520 }}
           width={400}
           maxHeight={520}
         >
-          <MigrationPanel
-            onFocus={handleFocus}
-            onSelectKey={setFaultKey}
-          />
+          <MigrationPanel onFocus={handleFocus} onSelectKey={setFaultKey} />
         </FloatingPanel>
       )}
     </>
@@ -250,7 +293,10 @@ function Dashboard() {
   if (isMobile && isLandscape) {
     return (
       <div className="flex h-screen bg-slate-950 text-slate-200">
-        <div className="relative w-1/2 shrink-0">{globe}</div>
+        <div className="relative w-1/2 shrink-0">
+          {globe}
+          {controls}
+        </div>
         <div className="w-1/2 overflow-y-auto p-2 space-y-2 border-l border-white/10">
           {panelNodes}
         </div>
@@ -261,7 +307,10 @@ function Dashboard() {
   if (isMobile) {
     return (
       <div className="flex flex-col h-screen bg-slate-950 text-slate-200">
-        <div className="relative h-[45vh] min-h-[240px] shrink-0">{globe}</div>
+        <div className="relative h-[45vh] min-h-[240px] shrink-0">
+          {globe}
+          {controls}
+        </div>
         <div className="flex-1 overflow-y-auto p-3 space-y-2">{panelNodes}</div>
       </div>
     );
@@ -277,6 +326,7 @@ function Dashboard() {
         atMinimum={atMinimum}
         minOpen={minOpen}
       />
+      {controls}
       {panelNodes}
     </div>
   );
