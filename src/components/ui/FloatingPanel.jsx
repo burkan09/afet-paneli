@@ -7,27 +7,39 @@ export default function FloatingPanel({
   width = 280,
   maxHeight = 420,
   defaultOpen = true,
+  stacked = false,
   children,
 }) {
   const { pos, handleProps } = useDraggable(initial);
   const [open, setOpen] = useState(defaultOpen);
 
+  const layout = stacked
+    ? { position: "relative", width: "100%" }
+    : { position: "absolute", left: pos.x, top: pos.y, width };
+
   return (
     <section
-      className="absolute z-10 rounded-xl border border-white/10 bg-slate-950/40 backdrop-blur-md shadow-2xl shadow-black/40 overflow-hidden"
-      style={{ left: pos.x, top: pos.y, width }}
+      className="z-10 rounded-xl border border-white/10 bg-slate-950/45 backdrop-blur-md shadow-2xl shadow-black/40 overflow-hidden"
+      style={layout}
     >
       <header
-        {...handleProps}
-        className="flex items-center justify-between px-3 py-2 cursor-grab active:cursor-grabbing select-none bg-white/5 border-b border-white/10 touch-none"
+        {...(stacked ? {} : handleProps)}
+        onClick={stacked ? () => setOpen((v) => !v) : undefined}
+        className={`flex items-center justify-between px-3 py-2 select-none bg-white/5 border-b border-white/10 touch-none ${
+          stacked ? "cursor-pointer" : "cursor-grab active:cursor-grabbing"
+        }`}
       >
         <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-300">
           {title}
         </h2>
         <button
-          onClick={() => setOpen((v) => !v)}
-          className="text-slate-400 hover:text-slate-100 text-xs px-1"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen((v) => !v);
+          }}
+          className="text-slate-400 hover:text-slate-100 text-sm px-1"
           aria-label={open ? "Paneli daralt" : "Paneli genişlet"}
+          aria-expanded={open}
         >
           {open ? "−" : "+"}
         </button>

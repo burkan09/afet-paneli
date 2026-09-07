@@ -2,22 +2,31 @@ import { useCallback, useMemo, useState } from "react";
 import { FilterProvider, useFilters } from "./context/FilterContext";
 import { useDisasters } from "./hooks/useDisasters";
 import { useAutoRefresh } from "./hooks/useAutoRefresh";
+import { usePanels } from "./hooks/usePanels";
+import { useIsMobile } from "./hooks/useIsMobile";
+import { useIsLandscape } from "./hooks/useOrientation";
 import { applyFilters, computeStats, countByType } from "./lib/filter";
 import { totalEnergy, energyComparison } from "./lib/energy";
 import FilterPanel from "./components/Filters/FilterPanel";
 import EventList from "./components/EventList";
 import EventGlobe from "./components/Globe/EventGlobe";
 import HotspotPanel from "./components/Globe/HotspotPanel";
+import MajorEventsPanel from "./components/Globe/MajorEventsPanel";
 import DetailPanel from "./components/DetailPanel/DetailPanel";
 import ChartGrid from "./components/Charts/ChartGrid";
 import FloatingPanel from "./components/ui/FloatingPanel";
+import ToolbarMenu from "./components/ui/ToolbarMenu";
 import StatBar from "./components/ui/StatBar";
 import { formatTime } from "./lib/format";
 
 function Dashboard() {
   const { filters } = useFilters();
-  const { events, loading, error, updatedAt, sourceErrors, reload } =
+  const { events, loading, error, updatedAt, stale, sourceErrors, reload } =
     useDisasters(filters.range);
+
+  const { panels, toggle, reset, atMinimum, minOpen } = usePanels();
+  const isMobile = useIsMobile();
+  const isLandscape = useIsLandscape();
 
   const [detail, setDetail] = useState(null);
   const [focus, setFocus] = useState(null);
@@ -30,10 +39,11 @@ function Dashboard() {
     setFocus(d ? { lat: d.lat, lon: d.lon } : null);
   }, []);
 
-  const handleHotspotClick = useCallback((b) => {
-    setFocus({ lat: b.lat, lon: b.lng });
-  }, []);
-
+  const handleFocus = useCallback((p) => setFocus(p), []);
+  const handleHotspotClick = useCallback(
+    (b) => setFocus({ lat: b.lat, lon: b.lng }),
+    []
+  );
   const handleHotspots = useCallback((next) => setHotspots(next), []);
 
   const filtered = useMemo(
@@ -45,106 +55,175 @@ function Dashboard() {
   const stats = useMemo(() => computeStats(filtered), [filtered]);
   const energy = useMemo(
     () =>
-      energyComparison(
-        totalEnergy(filtered.filter((e) => e.magnitude != null))
-      ),
+      energyComparison(totalEnergy(filtered.filter((e) => e.magnitude != null))),
     [filtered]
   );
 
   const right = Math.max(20, window.innerWidth - 350);
+  const s = isMobile;
 
-  return (
-    <div className="relative w-screen h-screen overflow-hidden bg-slate-950">
-      <EventGlobe
-        events={filtered}
-        selected={focus}
-        onSelect={handleSelect}
-        showHistory={filters.showHistory}
-        onHotspots={handleHotspots}
-        theme={filters.theme}
-      />
+  const show = (key) => (s ? true : panels[key].open);
+  const common = { stacked: s, defaultOpen: !s };
 
-      <FloatingPanel
-        title="Küresel Afet Paneli"
-        initial={{ x: 20, y: 20 }}
-        width={300}
-        maxHeight={220}
-      >
-        <StatBar
-          stats={[
-            { label: "Toplam olay", value: stats.count },
-            { label: "Deprem", value: stats.quakes },
-            { label: "En büyük", value: stats.max, hint: "büyüklük" },
-            { label: "Enerji", value: energy, hint: "TNT eşdeğeri" },
-          ]}
-        />
-        {updatedAt && (
-          <p className="text-[10px] text-slate-500 px-3 py-2">
-            Son güncelleme: {formatTime(updatedAt)}
-            {sourceErrors.length > 0 && (
-              <span className="text-amber-500">
-                {" "}
-                · {sourceErrors.join(", ")} yanıt vermedi
-              </span>
-            )}
-          </p>
-        )}
-      </FloatingPanel>
+  const globe = (
+    <EventGlobe
+      events={filtered}
+      selected={focus}
+      onSelect={handleSelect}
+      showHistory={filters.showHistory}
+      onHotspots={handleHotspots}
+      theme={filters.theme}
+    />
+  );
 
-      {filters.showHistory && (
+  const panelNodes = (
+    <>
+      {show("stats") && (
         <FloatingPanel
+          {...common}
+          title="Küresel Afet Paneli"
+          initial={{ x: 20, y: 20 }}
+          width={300}
+          maxHeight={240}
+        >
+          <StatBar
+            stats={[
+              { label: "Toplam olay", value: stats.count },
+              { label: "Deprem", value: stats.quakes },
+              { label: "En büyük", value: stats.max, hint: "büyüklük" },
+              { label: "Enerji", value: energy, hint: "TNT eşdeğeri" },
+            ]}
+          />
+          {updatedAt && (
+            <p className="text-[10px] text-slate-500 px-3 py-2">
+              {stale ? "Çevrimdışı veri: " : "Son güncelleme: "}
+              {formatTime(updatedAt)}
+              {sourceErrors.length > 0 && (
+                <span className="text-amber-500">
+                  {" "}
+                  · {sourceErrors.join(", ")} yanıt vermedi
+                </span>
+              )}
+            </p>
+          )}
+        </FloatingPanel>
+      )}
+
+      {show("hotspots") && (
+        <FloatingPanel
+          {...common}
           title="En aktif bölgeler"
-          initial={{ x: 20, y: 270 }}
+          initial={{ x: 20, y: 280 }}
           width={280}
+          maxHeight={360}
         >
           <HotspotPanel bins={hotspots} onSelect={handleHotspotClick} />
         </FloatingPanel>
       )}
 
-      <FloatingPanel
-        title="Filtreler"
-        initial={{ x: right, y: 20 }}
-        width={330}
-        maxHeight={560}
-      >
-        <FilterPanel counts={counts} />
-      </FloatingPanel>
+      {show("major") && (
+        <FloatingPanel
+          {...common}
+          title="Büyük depremler"
+          initial={{ x: 20, y: 570 }}
+          width={300}
+          maxHeight={340}
+        >
+          <MajorEventsPanel onFocus={handleFocus} />
+        </FloatingPanel>
+      )}
 
-      <FloatingPanel
-        title="Olay listesi"
-        initial={{ x: 340, y: 20 }}
-        width={400}
-        maxHeight={340}
-      >
-        <div className="p-3">
-          <EventList
-            events={filtered}
-            loading={loading}
-            error={error}
-            onRetry={reload}
-            onSelect={handleSelect}
-          />
+      {show("filters") && (
+        <FloatingPanel
+          {...common}
+          title="Filtreler"
+          initial={{ x: right, y: 20 }}
+          width={330}
+          maxHeight={560}
+        >
+          <FilterPanel counts={counts} />
+        </FloatingPanel>
+      )}
+
+      {show("events") && (
+        <FloatingPanel
+          {...common}
+          title="Olay listesi"
+          initial={{ x: 340, y: 20 }}
+          width={400}
+          maxHeight={340}
+        >
+          <div className="p-3">
+            <EventList
+              events={filtered}
+              loading={loading}
+              error={error}
+              onRetry={reload}
+              onSelect={handleSelect}
+            />
+          </div>
+        </FloatingPanel>
+      )}
+
+      {show("detail") && (
+        <FloatingPanel
+          {...common}
+          title="Seçili olay"
+          initial={{ x: 760, y: 20 }}
+          width={330}
+          maxHeight={420}
+        >
+          <DetailPanel event={detail} onClose={() => setDetail(null)} />
+        </FloatingPanel>
+      )}
+
+      {show("charts") && (
+        <FloatingPanel
+          {...common}
+          title="Grafikler"
+          initial={{ x: 340, y: 400 }}
+          width={420}
+          maxHeight={380}
+        >
+          <div className="p-3">
+            <ChartGrid events={filtered} />
+          </div>
+        </FloatingPanel>
+      )}
+    </>
+  );
+
+  if (isMobile && isLandscape) {
+    return (
+      <div className="flex h-screen bg-slate-950">
+        <div className="relative w-1/2 shrink-0">{globe}</div>
+        <div className="w-1/2 overflow-y-auto p-2 space-y-2 border-l border-white/10">
+          {panelNodes}
         </div>
-      </FloatingPanel>
+      </div>
+    );
+  }
 
-      <FloatingPanel
-        title="Seçili olay"
-        initial={{ x: 760, y: 20 }}
-        width={330}
-      >
-        <DetailPanel event={detail} onClose={() => setDetail(null)} />
-      </FloatingPanel>
+  if (isMobile) {
+    return (
+      <div className="flex flex-col h-screen bg-slate-950">
+        <div className="relative h-[45vh] min-h-[240px] shrink-0">{globe}</div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">{panelNodes}</div>
+      </div>
+    );
+  }
 
-      <FloatingPanel
-        title="Grafikler"
-        initial={{ x: 340, y: 400 }}
-        width={420}
-        maxHeight={380}
-      >
-        <div className="p-3">
-          <ChartGrid events={filtered} />
-        </div>
-      </FloatingPanel>
+  return (
+    <div className="relative w-screen h-screen overflow-hidden bg-slate-950">
+      {globe}
+      <ToolbarMenu
+        panels={panels}
+        onToggle={toggle}
+        onReset={reset}
+        atMinimum={atMinimum}
+        minOpen={minOpen}
+      />
+      {panelNodes}
     </div>
   );
 }
