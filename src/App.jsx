@@ -5,6 +5,7 @@ import { useAutoRefresh } from "./hooks/useAutoRefresh";
 import { usePanels } from "./hooks/usePanels";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useIsLandscape } from "./hooks/useOrientation";
+import { useAnalysis } from "./hooks/useAnalysis";
 import { applyFilters, computeStats, countByType } from "./lib/filter";
 import { totalEnergy, energyComparison } from "./lib/energy";
 import FilterPanel from "./components/Filters/FilterPanel";
@@ -15,12 +16,11 @@ import MajorEventsPanel from "./components/Globe/MajorEventsPanel";
 import DetailPanel from "./components/DetailPanel/DetailPanel";
 import ChartGrid from "./components/Charts/ChartGrid";
 import GutenbergChart from "./components/Charts/GutenbergChart";
+import MigrationPanel from "./components/Analysis/MigrationPanel";
 import FloatingPanel from "./components/ui/FloatingPanel";
 import ToolbarMenu from "./components/ui/ToolbarMenu";
 import StatBar from "./components/ui/StatBar";
 import { formatTime } from "./lib/format";
-import MigrationPanel from "./components/Analysis/MigrationPanel";
-import { useAnalysis } from "./hooks/useAnalysis";
 
 function Dashboard() {
   const { filters } = useFilters();
@@ -34,6 +34,16 @@ function Dashboard() {
   const [detail, setDetail] = useState(null);
   const [focus, setFocus] = useState(null);
   const [hotspots, setHotspots] = useState([]);
+  const [faultKey, setFaultKey] = useState(null);
+  const [selectedPlate, setSelectedPlate] = useState(null);
+
+  const { data: migrationData } = useAnalysis("migration");
+
+  const activeFault = useMemo(() => {
+    if (!migrationData) return null;
+    const key = faultKey ?? Object.keys(migrationData)[0];
+    return migrationData[key] ?? null;
+  }, [migrationData, faultKey]);
 
   useAutoRefresh(reload, 60000, filters.autoRefresh);
 
@@ -48,20 +58,16 @@ function Dashboard() {
     []
   );
   const handleHotspots = useCallback((next) => setHotspots(next), []);
+  const handlePlateClick = useCallback(
+    (name) => setSelectedPlate((prev) => (prev === name ? null : name)),
+    []
+  );
 
   const filtered = useMemo(
     () => applyFilters(events, filters).sort((a, b) => b.time - a.time),
     [events, filters]
   );
 
-  const [faultKey, setFaultKey] = useState(null);
-  const { data: migrationData } = useAnalysis("migration");
-
-  const faultLine = useMemo(() => {
-    if (!migrationData) return null;
-    const key = faultKey ?? Object.keys(migrationData)[0];
-    return migrationData[key]?.line ?? null;
-  }, [migrationData, faultKey]);
   const counts = useMemo(() => countByType(events), [events]);
   const stats = useMemo(() => computeStats(filtered), [filtered]);
   const energy = useMemo(
@@ -79,12 +85,15 @@ function Dashboard() {
   const globe = (
     <EventGlobe
       events={filtered}
-      showPlates={filters.showPlates}
       selected={focus}
       onSelect={handleSelect}
       showHistory={filters.showHistory}
+      showPlates={filters.showPlates}
+      faultLine={activeFault?.line ?? null}
+      faultVelocity={activeFault?.migration?.velocity_km_per_year ?? 0}
+      selectedPlate={selectedPlate}
+      onPlateClick={handlePlateClick}
       onHotspots={handleHotspots}
-      faultLine={faultLine}
       theme={filters.theme}
     />
   );
@@ -119,19 +128,14 @@ function Dashboard() {
               )}
             </p>
           )}
+          {selectedPlate && (
+            <p className="text-[10px] text-red-400 px-3 pb-2">
+              Seçili levha sınırı: {selectedPlate}
+            </p>
+          )}
         </FloatingPanel>
       )}
-      {show("migration") && (
-        <FloatingPanel
-          {...common}
-          title="Göç analizi"
-          initial={{ x: 340, y: 400 }}
-          width={400}
-          maxHeight={520}
-        >
-          <MigrationPanel onFocus={handleFocus} />
-        </FloatingPanel>
-      )}
+
       {show("hotspots") && (
         <FloatingPanel
           {...common}
@@ -220,9 +224,24 @@ function Dashboard() {
           title="Gutenberg-Richter"
           initial={{ x: 760, y: 460 }}
           width={340}
-          maxHeight={430}
+          maxHeight={470}
         >
           <GutenbergChart />
+        </FloatingPanel>
+      )}
+
+      {show("migration") && (
+        <FloatingPanel
+          {...common}
+          title="Göç analizi"
+          initial={{ x: 1120, y: 20 }}
+          width={400}
+          maxHeight={520}
+        >
+          <MigrationPanel
+            onFocus={handleFocus}
+            onSelectKey={setFaultKey}
+          />
         </FloatingPanel>
       )}
     </>

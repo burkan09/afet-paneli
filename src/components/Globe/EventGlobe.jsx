@@ -22,6 +22,9 @@ export default function EventGlobe({
   showHistory,
   showPlates,
   faultLine,
+  faultVelocity = 0,
+  selectedPlate,
+  onPlateClick,
   onHotspots,
   theme = "day",
 }) {
@@ -31,12 +34,7 @@ export default function EventGlobe({
   const [resolution, setResolution] = useState(2);
 
   const { points } = useSeismicity();
-  const plates = usePlates(showPlates);
-    const allPaths = useMemo(() => {
-    const out = showPlates ? [...plates] : [];
-    if (faultLine?.length) out.push(faultLine);
-    return out;
-  }, [plates, showPlates, faultLine]);
+  const plates = usePlates();
   const style = GLOBE_THEMES[theme] ?? GLOBE_THEMES.day;
 
   useEffect(() => {
@@ -86,6 +84,24 @@ export default function EventGlobe({
     }));
   }, [points, showHistory]);
 
+  const paths = useMemo(() => {
+    const out = showPlates ? [...plates] : [];
+
+    if (faultLine?.length) {
+      const coords =
+        faultVelocity < 0 ? [...faultLine].reverse() : [...faultLine];
+      out.push({ id: "__fault", name: "fay", kind: "fault", coords });
+    }
+
+    return out;
+  }, [plates, showPlates, faultLine, faultVelocity]);
+
+  const dashTime = useMemo(() => {
+    const v = Math.abs(faultVelocity);
+    if (!v) return 0;
+    return Math.min(20000, Math.max(1500, 24000 / v));
+  }, [faultVelocity]);
+
   const ringData = useMemo(
     () =>
       [...events].sort((a, b) => b.impactScore - a.impactScore).slice(0, 20),
@@ -105,12 +121,29 @@ export default function EventGlobe({
         atmosphereColor={style.atmosphere}
         atmosphereAltitude={0.16}
         onZoom={handleZoom}
-        pathsData={allPaths}
-        pathPoints={(d) => d}
+        pathsData={paths}
+        pathPoints={(d) => d.coords}
         pathPointLat={(p) => p[0]}
         pathPointLng={(p) => p[1]}
-        pathColor={(d) => (d === faultLine ? "#fbbf24" : "#ef4444")}
-        pathStroke={(d) => (d === faultLine ? 2.5 : 1.2)}
+        pathPointAlt={(d) => (d.kind === "fault" ? 0.012 : 0.005)}
+        pathColor={(d) => {
+          if (d.kind === "fault") return "#22d3ee";
+          if (d.pairKey === selectedPlate) return "#ef4444";
+          return d.subduction ? "#fb923c" : "#facc15";
+        }}
+        pathStroke={(d) => {
+          if (d.kind === "fault") return 2.2;
+          if (d.pairKey === selectedPlate) return 1.8;
+          return d.subduction ? 1.0 : 0.7;
+        }}        pathDashLength={(d) =>
+          d.kind === "fault" ? 0.04 : d.subduction ? 0.6 : 1
+        }
+        pathDashGap={(d) =>
+          d.kind === "fault" ? 0.03 : d.subduction ? 0.15 : 0
+        }
+        pathDashAnimateTime={(d) => (d.kind === "fault" ? dashTime : 0)}
+        pathLabel={(d) => (d.kind === "fault" ? "" : d.name)}
+        onPathClick={(d) => d.kind === "plate" && onPlateClick?.(d.pairKey)}
         pathTransitionDuration={0}
         hexBinPointsData={historyPoints}
         hexBinPointLat="lat"
@@ -125,8 +158,8 @@ export default function EventGlobe({
         pointLat="lat"
         pointLng="lon"
         pointColor={(d) => impactToColor(d.impactScore)}
-        pointAltitude={(d) => Math.max(0.01, (d.impactScore / 100) * 0.22)}
-        pointRadius={(d) => Math.max(0.18, (d.impactScore / 100) * 0.75)}
+        pointAltitude={(d) => Math.max(0.004, (d.impactScore / 100) * 0.06)}
+        pointRadius={(d) => Math.max(0.12, (d.impactScore / 100) * 0.35)}
         pointLabel={(d) =>
           `${typeInfo(d.type).label}${
             d.magnitude != null ? ` M${d.magnitude.toFixed(1)}` : ""

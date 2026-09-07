@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 
-export function usePlates(enabled = true) {
-  const [paths, setPaths] = useState([]);
+export function usePlates() {
+  const [plates, setPlates] = useState([]);
 
   useEffect(() => {
-    if (!enabled) return;
     let cancelled = false;
 
     fetch("/plates.geojson")
@@ -15,28 +14,44 @@ export function usePlates(enabled = true) {
       .then((json) => {
         if (cancelled) return;
 
-        const lines = [];
+        const out = [];
         for (const f of json.features ?? []) {
           const g = f.geometry;
           if (!g) continue;
 
-          if (g.type === "LineString") {
-            lines.push(g.coordinates);
-          } else if (g.type === "MultiLineString") {
-            lines.push(...g.coordinates);
-          }
+          const name =
+            f.properties?.Name ??
+            f.properties?.name ??
+            f.properties?.LAYER ??
+            "sınır";
+
+          const lines =
+            g.type === "LineString"
+              ? [g.coordinates]
+              : g.type === "MultiLineString"
+              ? g.coordinates
+              : [];
+
+          lines.forEach((coords, i) => {
+            out.push({
+              id: `${name}-${i}`,
+              name,
+              kind: "plate",
+              coords: coords.map(([lon, lat]) => [lat, lon]),
+            });
+          });
         }
 
-        setPaths(lines.map((c) => c.map(([lon, lat]) => [lat, lon])));
+        setPlates(out);
       })
       .catch(() => {
-        if (!cancelled) setPaths([]);
+        if (!cancelled) setPlates([]);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, []);
 
-  return paths;
+  return plates;
 }

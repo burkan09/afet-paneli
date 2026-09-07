@@ -1,57 +1,76 @@
-"""Gutenberg-Richter uyumu: global ve bolge bazli."""
+"""Ulke bazli Gutenberg-Richter analizi."""
 import json
 from pathlib import Path
 import numpy as np
+from shapely.geometry import shape, Point
+from shapely.strtree import STRtree
 
-IN = Path("analysis/data/catalog.json")
-OUT = Path("public/analysis/gutenberg.json")
+ROOT = Path(__file__).resolve().parent.parent
+CATALOG = ROOT / "analysis" / "data" / "catalog.json"
+COUNTRIES = ROOT / "analysis" / "data" / "countries.geojson"
+OUT = ROOT / "public" / "analysis" / "gutenberg.json"
 
-REGIONS = {
-    "global": None,
-    "turkiye": (35.0, 43.0, 25.0, 45.0),
-    "yunanistan": (34.0, 42.0, 19.0, 29.0),
-    "italya": (36.0, 47.0, 6.0, 19.0),
-    "izlanda": (63.0, 67.0, -25.0, -13.0),
-    "iran": (25.0, 40.0, 44.0, 64.0),
-    "afganistan": (29.0, 39.0, 60.0, 75.0),
-    "himalaya": (26.0, 36.0, 72.0, 96.0),
-    "japonya": (30.0, 46.0, 129.0, 146.0),
-    "tayvan": (21.0, 26.0, 119.0, 123.0),
-    "filipinler": (5.0, 20.0, 117.0, 127.0),
-    "endonezya": (-11.0, 6.0, 95.0, 141.0),
-    "papua": (-11.0, -1.0, 130.0, 156.0),
-    "kamcatka": (50.0, 62.0, 155.0, 170.0),
-    "yeni_zelanda": (-48.0, -34.0, 165.0, 180.0),
-    "alaska": (51.0, 72.0, -170.0, -130.0),
-    "kaliforniya": (32.0, 42.0, -125.0, -114.0),
-    "meksika": (14.0, 33.0, -118.0, -86.0),
-    "karayipler": (10.0, 20.0, -85.0, -60.0),
-    "peru": (-19.0, -3.0, -82.0, -68.0),
-    "sili": (-56.0, -17.0, -76.0, -66.0),
-    "dogu_afrika": (-12.0, 15.0, 28.0, 42.0),
-}
-
-def in_box(rows, box):
-    if box is None:
-        return rows
-    lat0, lat1, lon0, lon1 = box
-    return [r for r in rows
-            if lat0 <= r["lat"] <= lat1 and lon0 <= r["lon"] <= lon1]
+MIN_EVENTS = 300
+MIN_MAG = 4.5
+MAX_MAG = 8.5
+STEP = 0.5
 
 
-def fit(rows, min_mag=4.5, max_mag=8.0, step=0.5):
-    if len(rows) < 50:
+def load_countries():
+    data = json.loads(COUNTRIES.read_text(encoding="utf-8"))
+    geoms, names = [], []
+
+    for f in data["features"]:
+        props = f.get("properties", {})
+        name = props.get("ADMIN") or props.get("name") or props.get("NAME")
+        if not name or not f.get("geometry"):
+            continue
+        geoms.append(shape(f["geometry"]))
+        names.append(name)
+
+    return geoms, names, STRtree(geoms)
+
+
+def assign_countries(rows, geoms, names, tree):
+    buckets = {}
+    unassigned = 0
+
+    for i, r in enumerate(rows):
+        if i % 50000 == 0:
+            print(f"  {i}/{len(rows)}", flush=True)
+
+        p = Point(r["lon"], r["lat"])
+        hit = None
+        for idx in tree.query(p):
+            if geoms[idx].contains(p):
+                hit = names[idx]
+                break
+
+        if hit is None:
+            near = tree.query_nearest(p, max_distance=3.0)
+            if len(near):
+                idx = int(near[0])
+                hit = names[idx]
+            else:
+                unassigned += 1
+                continue
+        buckets.setdefault(hit, []).append(r)
+
+    print(f"  denizde/atanamayan: {unassigned}")
+    return buckets
+
+
+def fit(rows):
+    if len(rows) < MIN_EVENTS:
         return None
 
     mags = np.array([r["mag"] for r in rows])
-    edges = np.arange(min_mag, max_mag + step, step)
-
-    # birikimli sayim: M >= edge olan olay sayisi
+    edges = np.arange(MIN_MAG, MAX_MAG + STEP, STEP)
     counts = np.array([(mags >= e).sum() for e in edges], dtype=float)
+
     mask = counts > 0
     x, y = edges[mask], np.log10(counts[mask])
-
-    if len(x) < 3:
+    if len(x) < 4:
         return None
 
     slope, intercept = np.polyfit(x, y, 1)
@@ -62,8 +81,7 @@ def fit(rows, min_mag=4.5, max_mag=8.0, step=0.5):
     times = np.array([r["time"] for r in rows], dtype=np.int64)
     years = (times.max() - times.min()) / (365.25 * 86_400_000)
 
-    b = float(-slope)
-    a = float(intercept)
+    a, b = float(intercept), float(-slope)
 
     return {
         "a": round(a, 4),
@@ -83,19 +101,36 @@ def fit(rows, min_mag=4.5, max_mag=8.0, step=0.5):
     }
 
 
-def main() -> None:
-    rows = json.loads(IN.read_text(encoding="utf-8"))
-    OUT.parent.mkdir(parents=True, exist_ok=True)
+def main():
+    rows = json.loads(CATALOG.read_text(encoding="utf-8"))
+    print(f"{len(rows)} deprem yuklendi")
 
-    result = {}
-    for name, box in REGIONS.items():
-        subset = in_box(rows, box)
+    geoms, names, tree = load_countries()
+    print(f"{len(names)} ulke poligonu yuklendi")
+
+    print("ulkelere ataniyor...")
+    buckets = assign_countries(rows, geoms, names, tree)
+
+    result = {"global": fit(rows)}
+    for name, subset in buckets.items():
         f = fit(subset)
         if f:
             result[name] = f
-            print(f"{name:14s} b={f['b']:.3f}  R²={f['r2']:.4f}  n={f['n']}")
 
-    OUT.write_text(json.dumps(result, indent=1), encoding="utf-8")
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(result), encoding="utf-8")
+
+    ranked = sorted(
+        ((k, v) for k, v in result.items() if k != "global"),
+        key=lambda kv: kv[1]["b"],
+    )
+    print(f"\n{len(ranked)} ulke analiz edildi\n")
+    print("--- en dusuk b (kilitli fay) ---")
+    for k, v in ranked[:8]:
+        print(f"  {k:22s} b={v['b']:.3f}  n={v['n']:6d}")
+    print("--- en yuksek b ---")
+    for k, v in ranked[-8:]:
+        print(f"  {k:22s} b={v['b']:.3f}  n={v['n']:6d}")
     print(f"\n→ {OUT}")
 
 
