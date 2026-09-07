@@ -1,4 +1,5 @@
 import { useFilters } from "../../context/FilterContext";
+import { GLOBE_THEMES } from "../../lib/globeStyle";
 
 const RANGES = [
   { key: "hour", label: "Son 1 saat" },
@@ -10,7 +11,7 @@ export default function FilterPanel() {
   const { filters, dispatch } = useFilters();
 
   return (
-    <div className="bg-slate-800/40 rounded-lg p-4 mb-6 space-y-4">
+    <div className="bg-slate-800/40 rounded-lg p-4 space-y-4">
       <div className="flex flex-wrap gap-2">
         {RANGES.map((r) => (
           <button
@@ -52,7 +53,26 @@ export default function FilterPanel() {
         />
       </div>
 
-      <div className="flex items-center justify-between pt-1">
+      <div>
+        <p className="text-sm text-slate-400 mb-2">Küre görünümü</p>
+        <div className="flex gap-2">
+          {Object.entries(GLOBE_THEMES).map(([key, t]) => (
+            <button
+              key={key}
+              onClick={() => dispatch({ type: "SET_THEME", value: key })}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                filters.theme === key
+                  ? "bg-sky-600 text-white"
+                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-2 pt-1">
         <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
           <input
             type="checkbox"
@@ -61,6 +81,16 @@ export default function FilterPanel() {
             className="accent-emerald-500"
           />
           Otomatik yenile (60 sn)
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={filters.showHistory}
+            onChange={() => dispatch({ type: "TOGGLE_HISTORY" })}
+            className="accent-slate-400"
+          />
+          Geçmiş sismiklik
         </label>
 
         <button

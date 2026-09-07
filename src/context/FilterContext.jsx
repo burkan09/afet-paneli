@@ -5,6 +5,8 @@ const initialState = {
   minMag: 0,
   search: "",
   autoRefresh: true,
+  showHistory: true,
+  theme: "day",
 };
 
 function reducer(state, action) {
@@ -17,6 +19,10 @@ function reducer(state, action) {
       return { ...state, search: action.value };
     case "TOGGLE_AUTO_REFRESH":
       return { ...state, autoRefresh: !state.autoRefresh };
+    case "TOGGLE_HISTORY":
+      return { ...state, showHistory: !state.showHistory };
+    case "SET_THEME":
+      return { ...state, theme: action.value };
     case "RESET":
       return initialState;
     default:
