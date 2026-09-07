@@ -10,6 +10,16 @@ import {
 
 const CACHE_KEY = "afet-paneli:son-veri";
 const CACHE_MAX_AGE = 6 * 3600000;
+const TIMEOUT_MS = 12000;
+
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} zaman aşımı`)), ms)
+    ),
+  ]);
+}
 
 function readCache() {
   try {
@@ -25,13 +35,12 @@ function readCache() {
 
 function writeCache(events) {
   try {
-    const trimmed = events.slice(0, 400);
     window.localStorage.setItem(
       CACHE_KEY,
-      JSON.stringify({ savedAt: Date.now(), events: trimmed })
+      JSON.stringify({ savedAt: Date.now(), events: events.slice(0, 400) })
     );
   } catch {
-    // Kota dolu olabilir, önemli değil
+    // kota dolu olabilir
   }
 }
 
@@ -39,7 +48,7 @@ export function useDisasters(range = "day") {
   const cached = useRef(readCache());
 
   const [events, setEvents] = useState(cached.current?.events ?? []);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cached.current);
   const [error, setError] = useState(null);
   const [updatedAt, setUpdatedAt] = useState(cached.current?.savedAt ?? null);
   const [stale, setStale] = useState(Boolean(cached.current));
@@ -49,13 +58,20 @@ export function useDisasters(range = "day") {
   useEffect(() => {
     let cancelled = false;
 
-    setLoading(true);
     setError(null);
 
     const tasks = [
-      fetchUsgs(range).then(normalizeUsgsCollection),
-      fetchEonet({ days: 60, limit: 300 }).then(normalizeEonetCollection),
-      fetchGdacs({ days: 14 }).then(normalizeGdacsCollection),
+      withTimeout(fetchUsgs(range).then(normalizeUsgsCollection), TIMEOUT_MS, "USGS"),
+      withTimeout(
+        fetchEonet({ days: 60, limit: 300 }).then(normalizeEonetCollection),
+        TIMEOUT_MS,
+        "EONET"
+      ),
+      withTimeout(
+        fetchGdacs({ days: 14 }).then(normalizeGdacsCollection),
+        TIMEOUT_MS,
+        "GDACS"
+      ),
     ];
 
     Promise.allSettled(tasks).then((results) => {
@@ -70,7 +86,12 @@ export function useDisasters(range = "day") {
         else failed.push(names[i]);
       });
 
-      if (ok.length === 0) {
+      if (ok.length > 0) {
+        setEvents(ok);
+        setUpdatedAt(Date.now());
+        setStale(false);
+        writeCache(ok);
+      } else {
         const yedek = readCache();
         if (yedek) {
           setEvents(yedek.events);
@@ -79,11 +100,6 @@ export function useDisasters(range = "day") {
         } else {
           setError("Hiçbir veri kaynağına ulaşılamadı");
         }
-      } else {
-        setEvents(ok);
-        setUpdatedAt(Date.now());
-        setStale(false);
-        writeCache(ok);
       }
 
       setSourceErrors(failed);

@@ -14,6 +14,7 @@ import HotspotPanel from "./components/Globe/HotspotPanel";
 import MajorEventsPanel from "./components/Globe/MajorEventsPanel";
 import DetailPanel from "./components/DetailPanel/DetailPanel";
 import ChartGrid from "./components/Charts/ChartGrid";
+import GutenbergChart from "./components/Charts/GutenbergChart";
 import FloatingPanel from "./components/ui/FloatingPanel";
 import ToolbarMenu from "./components/ui/ToolbarMenu";
 import StatBar from "./components/ui/StatBar";
@@ -190,12 +191,24 @@ function Dashboard() {
           </div>
         </FloatingPanel>
       )}
+
+      {show("gutenberg") && (
+        <FloatingPanel
+          {...common}
+          title="Gutenberg-Richter"
+          initial={{ x: 760, y: 460 }}
+          width={340}
+          maxHeight={430}
+        >
+          <GutenbergChart />
+        </FloatingPanel>
+      )}
     </>
   );
 
   if (isMobile && isLandscape) {
     return (
-      <div className="flex h-screen bg-slate-950">
+      <div className="flex h-screen bg-slate-950 text-slate-200">
         <div className="relative w-1/2 shrink-0">{globe}</div>
         <div className="w-1/2 overflow-y-auto p-2 space-y-2 border-l border-white/10">
           {panelNodes}
@@ -206,7 +219,7 @@ function Dashboard() {
 
   if (isMobile) {
     return (
-      <div className="flex flex-col h-screen bg-slate-950">
+      <div className="flex flex-col h-screen bg-slate-950 text-slate-200">
         <div className="relative h-[45vh] min-h-[240px] shrink-0">{globe}</div>
         <div className="flex-1 overflow-y-auto p-3 space-y-2">{panelNodes}</div>
       </div>
@@ -214,7 +227,7 @@ function Dashboard() {
   }
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-slate-950">
+    <div className="relative w-screen h-screen overflow-hidden bg-slate-950 text-slate-200">
       {globe}
       <ToolbarMenu
         panels={panels}

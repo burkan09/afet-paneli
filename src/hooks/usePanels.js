@@ -8,6 +8,7 @@ const DEFAULT_PANELS = {
   detail: { label: "Seçili olay", open: true },
   charts: { label: "Grafikler", open: false },
   major: { label: "Büyük depremler", open: false },
+  gutenberg: { label: "Gutenberg-Richter", open: false },
 };
 
 const MIN_OPEN = 3;

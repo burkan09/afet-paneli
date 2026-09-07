@@ -30,3 +30,11 @@ export function useSeismicity() {
 
   return { points, loading };
 }
+
+export function pointTime(p) {
+  return p[3] * 86400000;
+}
+
+export function pointYear(p) {
+  return new Date(p[3] * 86400000).getUTCFullYear();
+}
