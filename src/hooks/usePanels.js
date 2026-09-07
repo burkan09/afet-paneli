@@ -9,6 +9,7 @@ const DEFAULT_PANELS = {
   charts: { label: "Grafikler", open: false },
   major: { label: "Büyük depremler", open: false },
   gutenberg: { label: "Gutenberg-Richter", open: false },
+  migration: { label: "Göç analizi", open: false },
 };
 
 const MIN_OPEN = 3;

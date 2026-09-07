@@ -19,6 +19,8 @@ import FloatingPanel from "./components/ui/FloatingPanel";
 import ToolbarMenu from "./components/ui/ToolbarMenu";
 import StatBar from "./components/ui/StatBar";
 import { formatTime } from "./lib/format";
+import MigrationPanel from "./components/Analysis/MigrationPanel";
+import { useAnalysis } from "./hooks/useAnalysis";
 
 function Dashboard() {
   const { filters } = useFilters();
@@ -52,6 +54,14 @@ function Dashboard() {
     [events, filters]
   );
 
+  const [faultKey, setFaultKey] = useState(null);
+  const { data: migrationData } = useAnalysis("migration");
+
+  const faultLine = useMemo(() => {
+    if (!migrationData) return null;
+    const key = faultKey ?? Object.keys(migrationData)[0];
+    return migrationData[key]?.line ?? null;
+  }, [migrationData, faultKey]);
   const counts = useMemo(() => countByType(events), [events]);
   const stats = useMemo(() => computeStats(filtered), [filtered]);
   const energy = useMemo(
@@ -69,10 +79,12 @@ function Dashboard() {
   const globe = (
     <EventGlobe
       events={filtered}
+      showPlates={filters.showPlates}
       selected={focus}
       onSelect={handleSelect}
       showHistory={filters.showHistory}
       onHotspots={handleHotspots}
+      faultLine={faultLine}
       theme={filters.theme}
     />
   );
@@ -109,7 +121,17 @@ function Dashboard() {
           )}
         </FloatingPanel>
       )}
-
+      {show("migration") && (
+        <FloatingPanel
+          {...common}
+          title="Göç analizi"
+          initial={{ x: 340, y: 400 }}
+          width={400}
+          maxHeight={520}
+        >
+          <MigrationPanel onFocus={handleFocus} />
+        </FloatingPanel>
+      )}
       {show("hotspots") && (
         <FloatingPanel
           {...common}

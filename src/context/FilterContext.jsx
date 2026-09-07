@@ -4,6 +4,7 @@ import { FILTERABLE_TYPES } from "../lib/eventTypes";
 const initialState = {
   range: "day",
   minMag: 0,
+  showPlates: false,
   minImpact: 0,
   search: "",
   types: [...FILTERABLE_TYPES],
@@ -39,6 +40,8 @@ function reducer(state, action) {
       return { ...state, showHistory: !state.showHistory };
     case "SET_THEME":
       return { ...state, theme: action.value };
+    case "TOGGLE_PLATES":
+      return { ...state, showPlates: !state.showPlates };
     case "RESET":
       return initialState;
     default:

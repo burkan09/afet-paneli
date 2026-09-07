@@ -112,6 +112,15 @@ export default function FilterPanel({ counts }) {
           />
           Geçmiş sismiklik
         </label>
+        <label className="flex items-center gap-2 text-sm text-slate-400 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={filters.showPlates}
+            onChange={() => dispatch({ type: "TOGGLE_PLATES" })}
+            className="accent-red-500"
+          />
+          Levha sınırları
+        </label>
 
         <button
           onClick={() => dispatch({ type: "RESET" })}

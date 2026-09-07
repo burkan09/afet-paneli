@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Globe from "react-globe.gl";
 import { useSeismicity } from "../../hooks/useSeismicity";
+import { usePlates } from "../../hooks/usePlates";
 import {
   resolutionForAltitude,
   binPoints,
@@ -19,6 +20,8 @@ export default function EventGlobe({
   selected,
   onSelect,
   showHistory,
+  showPlates,
+  faultLine,
   onHotspots,
   theme = "day",
 }) {
@@ -28,6 +31,12 @@ export default function EventGlobe({
   const [resolution, setResolution] = useState(2);
 
   const { points } = useSeismicity();
+  const plates = usePlates(showPlates);
+    const allPaths = useMemo(() => {
+    const out = showPlates ? [...plates] : [];
+    if (faultLine?.length) out.push(faultLine);
+    return out;
+  }, [plates, showPlates, faultLine]);
   const style = GLOBE_THEMES[theme] ?? GLOBE_THEMES.day;
 
   useEffect(() => {
@@ -96,6 +105,13 @@ export default function EventGlobe({
         atmosphereColor={style.atmosphere}
         atmosphereAltitude={0.16}
         onZoom={handleZoom}
+        pathsData={allPaths}
+        pathPoints={(d) => d}
+        pathPointLat={(p) => p[0]}
+        pathPointLng={(p) => p[1]}
+        pathColor={(d) => (d === faultLine ? "#fbbf24" : "#ef4444")}
+        pathStroke={(d) => (d === faultLine ? 2.5 : 1.2)}
+        pathTransitionDuration={0}
         hexBinPointsData={historyPoints}
         hexBinPointLat="lat"
         hexBinPointLng="lng"
