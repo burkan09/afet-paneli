@@ -8,14 +8,9 @@ import {
   sample,
   throttle,
 } from "../../lib/cluster";
-import {
-  magnitudeToColor,
-  magnitudeToAltitude,
-  magnitudeToRadius,
-  magnitudeToRingRadius,
-  magnitudeToRingSpeed,
-  GLOBE_THEMES,
-} from "../../lib/globeStyle";
+import { GLOBE_THEMES } from "../../lib/globeStyle";
+import { impactToColor } from "../../lib/impact";
+import { typeInfo } from "../../lib/eventTypes";
 
 const MAX_HISTORY_POINTS = 45000;
 
@@ -83,7 +78,8 @@ export default function EventGlobe({
   }, [points, showHistory]);
 
   const ringData = useMemo(
-    () => [...events].sort((a, b) => b.magnitude - a.magnitude).slice(0, 20),
+    () =>
+      [...events].sort((a, b) => b.impactScore - a.impactScore).slice(0, 20),
     [events]
   );
 
@@ -112,17 +108,21 @@ export default function EventGlobe({
         pointsData={events}
         pointLat="lat"
         pointLng="lon"
-        pointColor={(d) => magnitudeToColor(d.magnitude)}
-        pointAltitude={(d) => magnitudeToAltitude(d.magnitude)}
-        pointRadius={(d) => magnitudeToRadius(d.magnitude)}
-        pointLabel={(d) => `${d.magnitude.toFixed(1)} — ${d.title}`}
+        pointColor={(d) => impactToColor(d.impactScore)}
+        pointAltitude={(d) => Math.max(0.01, (d.impactScore / 100) * 0.22)}
+        pointRadius={(d) => Math.max(0.18, (d.impactScore / 100) * 0.75)}
+        pointLabel={(d) =>
+          `${typeInfo(d.type).label}${
+            d.magnitude != null ? ` M${d.magnitude.toFixed(1)}` : ""
+          } — ${d.title}`
+        }
         onPointClick={(d) => onSelect(d)}
         ringsData={ringData}
         ringLat="lat"
         ringLng="lon"
-        ringColor={(d) => () => magnitudeToColor(d.magnitude)}
-        ringMaxRadius={(d) => magnitudeToRingRadius(d.magnitude)}
-        ringPropagationSpeed={(d) => magnitudeToRingSpeed(d.magnitude)}
+        ringColor={(d) => () => impactToColor(d.impactScore)}
+        ringMaxRadius={(d) => Math.max(1, (d.impactScore / 100) * 6)}
+        ringPropagationSpeed={(d) => 0.6 + (d.impactScore / 100) * 1.4}
         ringRepeatPeriod={1400}
       />
     </div>

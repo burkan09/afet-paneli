@@ -1,17 +1,18 @@
 import { useFilters } from "../../context/FilterContext";
 import { GLOBE_THEMES } from "../../lib/globeStyle";
+import TypeFilter from "./TypeFilter";
 
 const RANGES = [
-  { key: "hour", label: "Son 1 saat" },
-  { key: "day", label: "Son 24 saat" },
-  { key: "week", label: "Son 7 gün" },
+  { key: "hour", label: "1 saat" },
+  { key: "day", label: "24 saat" },
+  { key: "week", label: "7 gün" },
 ];
 
-export default function FilterPanel() {
+export default function FilterPanel({ counts }) {
   const { filters, dispatch } = useFilters();
 
   return (
-    <div className="bg-slate-800/40 rounded-lg p-4 space-y-4">
+    <div className="p-4 space-y-4">
       <div className="flex flex-wrap gap-2">
         {RANGES.map((r) => (
           <button
@@ -20,7 +21,7 @@ export default function FilterPanel() {
             className={`px-3 py-1.5 rounded text-sm transition-colors ${
               filters.range === r.key
                 ? "bg-emerald-600 text-white"
-                : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                : "bg-slate-700/70 text-slate-300 hover:bg-slate-600"
             }`}
           >
             {r.label}
@@ -32,13 +33,15 @@ export default function FilterPanel() {
         type="text"
         value={filters.search}
         onChange={(e) => dispatch({ type: "SET_SEARCH", value: e.target.value })}
-        placeholder="Konum ara (örn. Japan, Chile, Turkey)"
-        className="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 text-sm placeholder:text-slate-600 focus:outline-none focus:border-emerald-600"
+        placeholder="Konum ara"
+        className="w-full bg-slate-900/60 border border-slate-700 rounded px-3 py-2 text-sm placeholder:text-slate-600 focus:outline-none focus:border-emerald-600"
       />
+
+      <TypeFilter counts={counts} />
 
       <div>
         <label className="text-sm text-slate-400 block mb-2">
-          Minimum büyüklük: {filters.minMag.toFixed(1)}
+          Minimum büyüklük (deprem): {filters.minMag.toFixed(1)}
         </label>
         <input
           type="range"
@@ -54,6 +57,23 @@ export default function FilterPanel() {
       </div>
 
       <div>
+        <label className="text-sm text-slate-400 block mb-2">
+          Minimum etki skoru: {filters.minImpact}
+        </label>
+        <input
+          type="range"
+          min="0"
+          max="90"
+          step="5"
+          value={filters.minImpact}
+          onChange={(e) =>
+            dispatch({ type: "SET_MIN_IMPACT", value: Number(e.target.value) })
+          }
+          className="w-full accent-orange-500"
+        />
+      </div>
+
+      <div>
         <p className="text-sm text-slate-400 mb-2">Küre görünümü</p>
         <div className="flex gap-2">
           {Object.entries(GLOBE_THEMES).map(([key, t]) => (
@@ -63,7 +83,7 @@ export default function FilterPanel() {
               className={`px-3 py-1.5 rounded text-sm transition-colors ${
                 filters.theme === key
                   ? "bg-sky-600 text-white"
-                  : "bg-slate-700 text-slate-300 hover:bg-slate-600"
+                  : "bg-slate-700/70 text-slate-300 hover:bg-slate-600"
               }`}
             >
               {t.label}
@@ -88,7 +108,7 @@ export default function FilterPanel() {
             type="checkbox"
             checked={filters.showHistory}
             onChange={() => dispatch({ type: "TOGGLE_HISTORY" })}
-            className="accent-slate-400"
+            className="accent-rose-500"
           />
           Geçmiş sismiklik
         </label>

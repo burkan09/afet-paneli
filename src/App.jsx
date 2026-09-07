@@ -1,8 +1,8 @@
 import { useCallback, useMemo, useState } from "react";
 import { FilterProvider, useFilters } from "./context/FilterContext";
-import { useEarthquakes } from "./hooks/useEarthquakes";
+import { useDisasters } from "./hooks/useDisasters";
 import { useAutoRefresh } from "./hooks/useAutoRefresh";
-import { applyFilters, computeStats } from "./lib/filter";
+import { applyFilters, computeStats, countByType } from "./lib/filter";
 import { totalEnergy, energyComparison } from "./lib/energy";
 import FilterPanel from "./components/Filters/FilterPanel";
 import EventList from "./components/EventList";
@@ -16,9 +16,8 @@ import { formatTime } from "./lib/format";
 
 function Dashboard() {
   const { filters } = useFilters();
-  const { events, loading, error, updatedAt, reload } = useEarthquakes(
-    filters.range
-  );
+  const { events, loading, error, updatedAt, sourceErrors, reload } =
+    useDisasters(filters.range);
 
   const [detail, setDetail] = useState(null);
   const [focus, setFocus] = useState(null);
@@ -42,15 +41,18 @@ function Dashboard() {
     [events, filters]
   );
 
+  const counts = useMemo(() => countByType(events), [events]);
   const stats = useMemo(() => computeStats(filtered), [filtered]);
   const energy = useMemo(
-    () => energyComparison(totalEnergy(filtered)),
+    () =>
+      energyComparison(
+        totalEnergy(filtered.filter((e) => e.magnitude != null))
+      ),
     [filtered]
   );
 
-  const right = Math.max(20, window.innerWidth - 340);
-  const bottom = Math.max(300, window.innerHeight - 340);
-  
+  const right = Math.max(20, window.innerWidth - 350);
+
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-slate-950">
       <EventGlobe
@@ -63,23 +65,28 @@ function Dashboard() {
       />
 
       <FloatingPanel
-        title="Küresel Deprem Paneli"
+        title="Küresel Afet Paneli"
         initial={{ x: 20, y: 20 }}
         width={300}
-        maxHeight={200}
+        maxHeight={220}
       >
         <StatBar
           stats={[
-            { label: "Olay sayısı", value: stats.count },
+            { label: "Toplam olay", value: stats.count },
+            { label: "Deprem", value: stats.quakes },
             { label: "En büyük", value: stats.max, hint: "büyüklük" },
-            { label: "Ort. derinlik", value: stats.avgDepth },
-            { label: "Toplam enerji", value: energy, hint: "TNT eşdeğeri" },
+            { label: "Enerji", value: energy, hint: "TNT eşdeğeri" },
           ]}
         />
         {updatedAt && (
           <p className="text-[10px] text-slate-500 px-3 py-2">
             Son güncelleme: {formatTime(updatedAt)}
-            {filters.autoRefresh && " · otomatik"}
+            {sourceErrors.length > 0 && (
+              <span className="text-amber-500">
+                {" "}
+                · {sourceErrors.join(", ")} yanıt vermedi
+              </span>
+            )}
           </p>
         )}
       </FloatingPanel>
@@ -87,7 +94,7 @@ function Dashboard() {
       {filters.showHistory && (
         <FloatingPanel
           title="En aktif bölgeler"
-          initial={{ x: 20, y: 250 }}
+          initial={{ x: 20, y: 270 }}
           width={280}
         >
           <HotspotPanel bins={hotspots} onSelect={handleHotspotClick} />
@@ -97,25 +104,17 @@ function Dashboard() {
       <FloatingPanel
         title="Filtreler"
         initial={{ x: right, y: 20 }}
-        width={320}
-        maxHeight={520}
+        width={330}
+        maxHeight={560}
       >
-        <FilterPanel />
-      </FloatingPanel>
-
-      <FloatingPanel
-        title="Seçili olay"
-        initial={{ x: right, y: 470 }}
-        width={320}
-      >
-        <DetailPanel event={detail} onClose={() => setDetail(null)} />
+        <FilterPanel counts={counts} />
       </FloatingPanel>
 
       <FloatingPanel
         title="Olay listesi"
-        initial={{ x: 20, y: bottom }}
-        width={420}
-        maxHeight={260}
+        initial={{ x: 340, y: 20 }}
+        width={400}
+        maxHeight={340}
       >
         <div className="p-3">
           <EventList
@@ -123,15 +122,24 @@ function Dashboard() {
             loading={loading}
             error={error}
             onRetry={reload}
+            onSelect={handleSelect}
           />
         </div>
       </FloatingPanel>
 
       <FloatingPanel
+        title="Seçili olay"
+        initial={{ x: 760, y: 20 }}
+        width={330}
+      >
+        <DetailPanel event={detail} onClose={() => setDetail(null)} />
+      </FloatingPanel>
+
+      <FloatingPanel
         title="Grafikler"
-        initial={{ x: 460, y: bottom }}
-        width={520}
-        maxHeight={300}
+        initial={{ x: 340, y: 400 }}
+        width={420}
+        maxHeight={380}
       >
         <div className="p-3">
           <ChartGrid events={filtered} />
