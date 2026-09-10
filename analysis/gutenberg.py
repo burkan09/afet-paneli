@@ -11,7 +11,7 @@ COUNTRIES = ROOT / "analysis" / "data" / "countries.geojson"
 OUT = ROOT / "public" / "analysis" / "gutenberg.json"
 
 MIN_EVENTS = 300
-MIN_MAG = 4.5
+MIN_MAG = 8
 MAX_MAG = 8.5
 STEP = 0.5
 

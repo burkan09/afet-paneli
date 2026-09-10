@@ -6,6 +6,8 @@ import { usePanels } from "./hooks/usePanels";
 import { useIsMobile } from "./hooks/useIsMobile";
 import { useIsLandscape } from "./hooks/useOrientation";
 import { useAnalysis } from "./hooks/useAnalysis";
+import { useTimeline, filterByCutoff } from "./hooks/useTimeline";
+import { useNewEvents } from "./hooks/useNewEvents";
 import { applyFilters, computeStats, countByType } from "./lib/filter";
 import { totalEnergy, energyComparison } from "./lib/energy";
 import FilterPanel from "./components/Filters/FilterPanel";
@@ -17,14 +19,16 @@ import MajorEventsPanel from "./components/Globe/MajorEventsPanel";
 import DetailPanel from "./components/DetailPanel/DetailPanel";
 import ChartGrid from "./components/Charts/ChartGrid";
 import GutenbergChart from "./components/Charts/GutenbergChart";
+import DepthSection from "./components/Charts/DepthSection";
 import MigrationPanel from "./components/Analysis/MigrationPanel";
 import ChainPanel from "./components/Analysis/ChainPanel";
+import TimelineSlider from "./components/Timeline/TimelineSlider";
+import LiveFeed from "./components/LiveFeed/LiveFeed";
 import FloatingPanel from "./components/ui/FloatingPanel";
 import ToolbarMenu from "./components/ui/ToolbarMenu";
+import Legend from "./components/ui/Legend";
 import StatBar from "./components/ui/StatBar";
 import { formatTime } from "./lib/format";
-import Legend from "./components/ui/Legend";
-import DepthSection from "./components/Charts/DepthSection";
 
 function Dashboard() {
   const { filters } = useFilters();
@@ -74,6 +78,14 @@ function Dashboard() {
     [events, filters]
   );
 
+  const timeline = useTimeline(filtered);
+  const { feed, clear, highlightMs } = useNewEvents(events);
+
+  const visible = useMemo(
+    () => filterByCutoff(filtered, timeline.cutoff),
+    [filtered, timeline.cutoff]
+  );
+
   const counts = useMemo(() => countByType(events), [events]);
   const stats = useMemo(() => computeStats(filtered), [filtered]);
   const energy = useMemo(
@@ -90,7 +102,7 @@ function Dashboard() {
 
   const globe = (
     <EventGlobe
-      events={filtered}
+      events={visible}
       selected={focus}
       onSelect={handleSelect}
       showHistory={filters.showHistory}
@@ -171,6 +183,18 @@ function Dashboard() {
         </FloatingPanel>
       )}
 
+      {show("legend") && (
+        <FloatingPanel
+          {...common}
+          title="Gösterge"
+          initial={{ x: 20, y: 920 }}
+          width={280}
+          maxHeight={420}
+        >
+          <Legend />
+        </FloatingPanel>
+      )}
+
       {show("filters") && (
         <FloatingPanel
           {...common}
@@ -193,13 +217,30 @@ function Dashboard() {
         >
           <div className="p-3">
             <EventList
-              events={filtered}
+              events={visible}
               loading={loading}
               error={error}
               onRetry={reload}
               onSelect={handleSelect}
             />
           </div>
+        </FloatingPanel>
+      )}
+
+      {show("livefeed") && (
+        <FloatingPanel
+          {...common}
+          title="Canlı akış"
+          initial={{ x: 340, y: 380 }}
+          width={380}
+          maxHeight={380}
+        >
+          <LiveFeed
+            feed={feed}
+            highlightMs={highlightMs}
+            onSelect={handleSelect}
+            onClear={clear}
+          />
         </FloatingPanel>
       )}
 
@@ -231,24 +272,13 @@ function Dashboard() {
         <FloatingPanel
           {...common}
           title="Grafikler"
-          initial={{ x: 340, y: 400 }}
+          initial={{ x: 340, y: 780 }}
           width={420}
           maxHeight={380}
         >
           <div className="p-3">
-            <ChartGrid events={filtered} />
+            <ChartGrid events={visible} />
           </div>
-        </FloatingPanel>
-      )}
-        {show("legend") && (
-        <FloatingPanel
-          {...common}
-          title="Gösterge"
-          initial={{ x: 20, y: 900 }}
-          width={280}
-          maxHeight={420}
-        >
-          <Legend />
         </FloatingPanel>
       )}
 
@@ -256,7 +286,7 @@ function Dashboard() {
         <FloatingPanel
           {...common}
           title="Derinlik kesiti"
-          initial={{ x: 400, y: 560 }}
+          initial={{ x: 790, y: 1000 }}
           width={400}
           maxHeight={480}
         >
@@ -326,6 +356,7 @@ function Dashboard() {
         atMinimum={atMinimum}
         minOpen={minOpen}
       />
+      <TimelineSlider timeline={timeline} visibleCount={visible.length} />
       {controls}
       {panelNodes}
     </div>

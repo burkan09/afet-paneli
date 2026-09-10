@@ -13,6 +13,7 @@ const DEFAULT_PANELS = {
   chain: { label: "Zincirleme analiz", open: false },
   legend: { label: "Gösterge", open: false },
   section: { label: "Derinlik kesiti", open: false },
+  livefeed: { label: "Canlı akış", open: false },
 };
 
 const MIN_OPEN = 3;
